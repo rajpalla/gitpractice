@@ -1,0 +1,12 @@
+version: '2'
+services:
+  apache2:
+       build: /home/ubuntu/lamp/apache/Dockerfile
+       ports:
+         - "8180:80"
+       links:
+         - mysql:db
+  mysql:
+       build: /home/ubuntu/lamp/mysql/Dockerfile
+       ports:
+         - "3306:3306"

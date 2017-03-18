@@ -1,0 +1,66 @@
+FROM ubuntu:16.04
+MAINTAINER devopsrajpalla@gmail.com
+RUN apt-get update && export TERM=xterm && apt-get install -y apt-utils debconf-utils dialog whiptail libterm-readline-perl-perl wget vim libaio1 libnuma1 psmisc libmecab2 python software-properties-common python-software-properties && add-apt-repository 'deb http://archive.ubuntu.com/ubuntu trusty universe'
+# Installing JAVA and its Configuration
+RUN wget -q --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u112-b15/jdk-8u112-linux-x64.tar.gz \
+&& mkdir /opt/jdk && tar -xzvf jdk-8u112-linux-x64.tar.gz -C /opt/jdk \
+&& update-alternatives --install /usr/bin/java java /opt/jdk/jdk1.8.0_112/bin/java 1100 \
+&& update-alternatives --install /usr/bin/javac javac /opt/jdk/jdk1.8.0_112/bin/javac 1100\
+&& java -version
+# Installing Tomcat8 and its configuration
+ENV JAVA_HOME=/opt/jdk/jdk1.8.0_112 \
+PATH=$JAVA_HOME/bin:$PATH \
+CATALINA_HOME=/opt/tomcat8/apache-tomcat-8.5.11 \
+CATALINA_BASE=$CATALINA_HOME \
+PATH=$JAVA_HOME/bin:$CATALINA_HOME/bin:$PATH
+RUN groupadd tomcat8 && useradd -g tomcat8 tomcat8 && mkdir /opt/tomcat8 \
+&& wget -q http://www-eu.apache.org/dist/tomcat/tomcat-8/v8.5.11/bin/apache-tomcat-8.5.11.tar.gz \
+&& tar -xzvf apache-tomcat-8.5.11.tar.gz -C /opt/tomcat8
+COPY tomcat-users.xml /opt/tomcat8/apache-tomcat-8.5.11/conf/tomcat-users.xml
+COPY context.xml /opt/tomcat8/apache-tomcat-8.5.11/webapps/host-manager/META-INF/context.xml
+COPY context.xml /opt/tomcat8/apache-tomcat-8.5.11/webapps/manager/META-INF/context.xml
+COPY manager.xml /opt/tomcat8/apache-tomcat-8.5.11/conf/Catalina/localhost/manager.xml
+RUN sed -i 's,<max-file-size>52428800</max-file-size>','<max-file-size>104857600</max-file-size>,g' /opt/tomcat8/apache-tomcat-8.5.11/webapps/manager/WEB-INF/web.xml \
+&& sed -i 's,<max-request-size>52428800</max-request-size>','<max-request-size>104857600</max-request-size>,g' /opt/tomcat8/apache-tomcat-8.5.11/webapps/manager/WEB-INF/web.xml \
+&& chmod -R 775 /opt/tomcat8/apache-tomcat-8.5.11/ && chown -R tomcat8:tomcat8 /opt/tomcat8/apache-tomcat-8.5.11/ && ./opt/tomcat8/apache-tomcat-8.5.11/bin/catalina.sh start
+# Installing Mysql and its configuration
+RUN apt-get update && { echo debconf debconf/frontend select Noninteractive; echo mysql-server mysql-server/root_password password openmrs; echo mysql-server mysql-server/root_password_again password openmrs; }  |  debconf-set-selections && apt-get install -y mysql-server-5.6 mysql-client-5.6 supervisor && mkdir -p /var/log/supervisor
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ENV MYSQL_MAJOR 5.6
+RUN chmod -R 777 /var/run/mysqld/ /var/lib/mysql/ \
+&& chown -R mysql:mysql /var/run/mysqld/ /var/lib/mysql/ \
+&& ln -s /tmp/mysqld.sock /var/run/mysqld/mysqld.sock
+EXPOSE 3306
+ADD mysql.sh /root/mysql.sh
+RUN chmod -R 777 /root/mysql.sh && chown -R mysql:mysql /root/mysql.sh
+RUN ./root/mysql.sh
+# Installing Openmrs and configuration
+RUN wget -q -O /opt/tomcat8/apache-tomcat-8.5.11/webapps/openmrs.war https://nchc.dl.sourceforge.net/project/openmrs/releases/OpenMRS_Platform_2.0.4.1/openmrs.war
+#&& mkdir -p /var/lib/OpenMRS
+#COPY openmrs-runtime.properties /var/lib/OpenMRS/openmrs-runtime.properties
+#COPY openmrs-runtime.properties ~/.OpenMRS/openmrs-runtime.properties
+COPY openmrs-runtime.properties /openmrs-runtime.properties
+RUN chmod -R 777 /openmrs-runtime.properties
+#COPY openmrs-runtime.properties /root/temp/openmrs-runtime.properties
+#RUN chown -R root:root /var/lib/OpenMRS \
+#&& chmod -R 777 /var/lib/OpenMRS /root/temp/openmrs-runtime.properties /openmrs-runtime.properties
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/supervisord"]
+
+
+                                                                                                                                
+docker rm -f $(docker ps -a -q)
+docker rmi -f
+docker images
+docker ps -a
+docker ps -l
+docker ps                                                                                                                                                     
+docker run -it -p 9090:8080 openmrs_ubuntu1604:v1  /bin/bash
+sudo docker build -t openmrs_ubuntu1604:v1 .
+
+
+Version: '5.7.17'  socket: '/tmp/tmp.UPYafQ1kvQ/mysqld.sock'  port: 3306  MySQL Community Server (GPL)
+
+Version: '5.7.17-0ubuntu0.16.04.1'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  (Ubuntu)
+
+
